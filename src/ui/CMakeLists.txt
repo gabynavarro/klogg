@@ -42,6 +42,8 @@ add_library(
   ${CMAKE_CURRENT_SOURCE_DIR}/include/tabnamemapping.h
   ${CMAKE_CURRENT_SOURCE_DIR}/include/iconloader.h
   ${CMAKE_CURRENT_SOURCE_DIR}/include/displayfilepath.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/remotelogrefresh.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/remotelogrefresh.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/include/downloader.h
   ${CMAKE_CURRENT_SOURCE_DIR}/include/decompressor.h
   ${CMAKE_CURRENT_SOURCE_DIR}/include/fontutils.h

@@ -121,6 +121,8 @@ class MainWindow : public QMainWindow {
     void openInEditor();
     void openClipboard();
     void openUrl();
+    void linkRemoteLog();
+    void refreshRemoteLog();
     void editHighlighters();
     void editPredefinedFilters( const QString& newFilter = {} );
     void options();

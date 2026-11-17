@@ -1,0 +1,12 @@
+# Standalone transport checks; no full klogg dependency build is needed.
+cmake_minimum_required(VERSION 3.12)
+project(klogg_remote_tests LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
+add_executable(klogg_remote_tests remotelogrefresh_test.cpp ../../src/ui/src/remotelogrefresh.cpp)
+target_include_directories(klogg_remote_tests PRIVATE ../../src/ui/include)
+target_link_libraries(klogg_remote_tests PRIVATE Qt${QT_VERSION_MAJOR}::Core)
+enable_testing()
+add_test(NAME remote_refresh COMMAND klogg_remote_tests)

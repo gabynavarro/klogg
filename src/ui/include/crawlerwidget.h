@@ -118,6 +118,9 @@ class CrawlerWidget : public QSplitter,
     void stopLoading();
     // Reload the displayed file
     void reload();
+    void reloadKeepingSearch();
+    QString searchText() const;
+    void setSearchText( const QString& text );
     // Set the encoding
     void setEncoding( std::optional<int> mib );
 
@@ -422,6 +425,7 @@ class CrawlerWidget : public QSplitter,
     // Until we have received confirmation loading is finished, we
     // should consider we are loading something.
     bool loadingInProgress_ = true;
+    bool remoteSearchPending_ = false;
     bool firstLoadDone_ = false;
 
     klogg::vector<LineNumber> savedMarkedLines_;

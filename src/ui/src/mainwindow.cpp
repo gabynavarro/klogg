@@ -87,6 +87,9 @@
 #include "decompressor.h"
 #include "dispatch_to.h"
 #include "downloader.h"
+#include "remotelogrefresh.h"
+#include <QPointer>
+#include <QVariant>
 #include "encodings.h"
 #include "favoritefiles.h"
 #include "highlightersdialog.h"
@@ -859,6 +862,11 @@ void MainWindow::createToolBars()
     toolBar->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Minimum );
     toolBar->addAction( openAction );
     toolBar->addAction( reloadAction );
+    auto* linkRemoteAction = toolBar->addAction( tr( "Link remote log..." ) );
+    linkRemoteAction->setToolTip( tr( "Create a separate SSH-backed copy of the current log" ) );
+    connect( linkRemoteAction, &QAction::triggered, this, &MainWindow::linkRemoteLog );
+    auto* refreshRemoteAction = toolBar->addAction( tr( "Refresh from server" ) );
+    connect( refreshRemoteAction, &QAction::triggered, this, &MainWindow::refreshRemoteLog );
     toolBar->addAction( followAction );
     toolBar->addAction( addToFavoritesAction );
     toolBar->addWidget( infoLine );
@@ -986,6 +994,80 @@ void MainWindow::openRemoteFile( const QUrl& url )
         QMessageBox::critical( this, tr( "Klogg - File download" ),
                                tr( "Failed to create temp file" ) );
     }
+}
+
+void MainWindow::linkRemoteLog()
+{
+    auto* current = currentCrawlerWidget();
+    if ( !current ) return;
+    if ( !current->property( "remoteLogSource" ).toString().isEmpty() ) {
+        QMessageBox::information( this, tr( "Remote log" ),
+                                  tr( "This tab is already linked. Use Refresh from server." ) );
+        return;
+    }
+    bool ok = false;
+    const auto input = QInputDialog::getText(
+        this, tr( "Link remote log" ),
+        tr( "SSH URL (uses your OpenSSH keys/agent and known hosts):\n"
+            "ssh://user@host:22/absolute/path/app.log\n"
+            "A separate local copy will be opened; the current file is kept." ),
+        QLineEdit::Normal, {}, &ok );
+    if ( !ok ) return;
+    const QUrl source( input.trimmed(), QUrl::StrictMode );
+    const auto error = RemoteLogRefresh::validate( source );
+    if ( !error.isEmpty() ) {
+        QMessageBox::warning( this, tr( "Remote log" ), error );
+        return;
+    }
+    const auto context = current->context()->toString();
+    const auto filter = current->searchText();
+    auto* cache = new QTemporaryFile( tempDir_.filePath( "remote-log-XXXXXX.log" ), this );
+    if ( !cache->open() ) {
+        QMessageBox::warning( this, tr( "Remote log" ), cache->errorString() );
+        cache->deleteLater();
+        return;
+    }
+    const auto path = cache->fileName();
+    cache->close();
+    if ( !loadFile( path ) ) { cache->deleteLater(); return; }
+    auto* linked = currentCrawlerWidget();
+    linked->setViewContext( context );
+    linked->setSearchText( filter );
+    linked->setProperty( "remoteLogSource", source.toString() );
+    refreshRemoteLog();
+}
+
+void MainWindow::refreshRemoteLog()
+{
+    QPointer<CrawlerWidget> crawler = currentCrawlerWidget();
+    if ( !crawler ) return;
+    const QUrl source( crawler->property( "remoteLogSource" ).toString() );
+    if ( source.isEmpty() ) {
+        QMessageBox::information( this, tr( "Remote log" ), tr( "Link this log to a server first." ) );
+        return;
+    }
+    if ( crawler->property( "remoteLogBusy" ).toBool() ) return;
+    crawler->setProperty( "remoteLogBusy", true );
+    auto* job = new RemoteLogRefresh( this );
+    auto* progress = new QProgressDialog( tr( "Downloading remote log..." ), tr( "Cancel" ), 0, 0, this );
+    progress->setWindowModality( Qt::NonModal );
+    progress->setMinimumDuration( 0 );
+    connect( progress, &QProgressDialog::canceled, job, [job] { job->cancel(); } );
+    connect( crawler.data(), &QObject::destroyed, job, [job] { job->cancel(); } );
+    job->start( source, session_.getFilename( crawler.data() ),
+                [this, crawler, job, progress]( const QString& error ) {
+        progress->close();
+        progress->deleteLater();
+        job->deleteLater();
+        if ( !crawler ) return;
+        crawler->setProperty( "remoteLogBusy", false );
+        if ( !error.isEmpty() ) {
+            QMessageBox::warning( this, tr( "Remote log" ), error );
+            return;
+        }
+        // Re-run this tab's current search after reindexing completes.
+        crawler->reloadKeepingSearch();
+    } );
 }
 
 void MainWindow::switchToOpenedFile( QAction* action )

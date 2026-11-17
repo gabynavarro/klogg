@@ -263,6 +263,22 @@ void CrawlerWidget::stopLoading()
     logData_->interruptLoading();
 }
 
+QString CrawlerWidget::searchText() const
+{
+    return searchLineEdit_->currentText();
+}
+
+void CrawlerWidget::setSearchText( const QString& text )
+{
+    searchLineEdit_->setEditText( text );
+}
+
+void CrawlerWidget::reloadKeepingSearch()
+{
+    remoteSearchPending_ = true;
+    reload();
+}
+
 void CrawlerWidget::reload()
 {
     searchState_.resetState();
@@ -732,6 +748,10 @@ void CrawlerWidget::loadingFinishedHandler( LoadingStatus status )
     }
 
     loadingInProgress_ = false;
+    if ( remoteSearchPending_ ) {
+        remoteSearchPending_ = false;
+        if ( status == LoadingStatus::Successful ) startNewSearch();
+    }
     Q_EMIT loadingFinished( status );
 }
 
